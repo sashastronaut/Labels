@@ -44,7 +44,7 @@
         
         label {
             display: inline-block;
-            width: 250px;
+            width: 180px;
             margin-right: 10px;
         }
         
@@ -52,7 +52,7 @@
             padding: 5px;
             border: 1px solid #ccc;
             border-radius: 3px;
-            width: 100px;
+            width: 80px;
         }
         
         input[type="file"] {
@@ -160,12 +160,8 @@
         <div class="section">
             <div class="section-title">3. QR-код</div>
             <div class="form-group">
-                <label for="qrWidth">Ширина QR-кода (мм):</label>
-                <input type="number" id="qrWidth" min="1" value="10">
-            </div>
-            <div class="form-group">
-                <label for="qrHeight">Высота QR-кода (мм):</label>
-                <input type="number" id="qrHeight" min="1" value="10">
+                <label for="qrSize">Размер QR-кода (мм):</label>
+                <input type="number" id="qrSize" min="1" value="10">
             </div>
         </div>
         
@@ -265,8 +261,7 @@
         const imageUpload = document.getElementById('imageUpload');
         const imgWidthInput = document.getElementById('imgWidth');
         const imgHeightInput = document.getElementById('imgHeight');
-        const qrWidthInput = document.getElementById('qrWidth');
-        const qrHeightInput = document.getElementById('qrHeight');
+        const qrSizeInput = document.getElementById('qrSize');
         const positionQRBtn = document.getElementById('positionQRBtn');
         const sheetSizeSelect = document.getElementById('sheetSizeSelect');
         const customSizeFields = document.getElementById('customSizeFields');
@@ -449,26 +444,25 @@
             }
             
             // Показываем QR-код на холсте
-            const qrWidth = parseFloat(qrWidthInput.value) * 3.78; // мм в пиксели
-            const qrHeight = parseFloat(qrHeightInput.value) * 3.78;
+            const qrSize = parseFloat(qrSizeInput.value) * 3.78; // мм в пиксели
             
-            qrCanvas.width = qrWidth;
-            qrCanvas.height = qrHeight;
+            qrCanvas.width = qrSize;
+            qrCanvas.height = qrSize;
             
             // Рисуем QR-код на временном холсте
             const tempCanvas = document.createElement('canvas');
-            tempCanvas.width = qrWidth;
-            tempCanvas.height = qrHeight;
+            tempCanvas.width = qrSize;
+            tempCanvas.height = qrSize;
             const tempCtx = tempCanvas.getContext('2d');
             
             // Заливаем QR-код серым цветом для демонстрации
             tempCtx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-            tempCtx.fillRect(0, 0, qrWidth, qrHeight);
+            tempCtx.fillRect(0, 0, qrSize, qrSize);
             
             // Рисуем границу
             tempCtx.strokeStyle = 'red';
             tempCtx.lineWidth = 2;
-            tempCtx.strokeRect(0, 0, qrWidth, qrHeight);
+            tempCtx.strokeRect(0, 0, qrSize, qrSize);
             
             // Копируем на основной QR-код холст
             const qrCtx = qrCanvas.getContext('2d');
@@ -487,8 +481,8 @@
             
             // Calculate position relative to the parent container
             qrCanvas.style.position = 'absolute';
-            qrCanvas.style.left = (rect.left - containerRect.left + window.scrollX + (rect.width - qrWidth) / 2) + 'px';
-            qrCanvas.style.top = (rect.top - containerRect.top + window.scrollY + (rect.height - qrHeight) / 2) + 'px';
+            qrCanvas.style.left = (rect.left - containerRect.left + window.scrollX + (rect.width - qrSize) / 2) + 'px';
+            qrCanvas.style.top = (rect.top - containerRect.top + window.scrollY + (rect.height - qrSize) / 2) + 'px';
             
             // Make sure the canvas is positioned relative to the parent container
             scaledCanvas.parentElement.style.position = 'relative';
@@ -663,8 +657,8 @@
                     
                     // Генерируем QR-код для текущего серийного номера
                     const qrDataUrl = generateQRCodeSVG(serialNum.toString(), 
-                        parseFloat(qrWidthInput.value) * pxPerMm, 
-                        parseFloat(qrHeightInput.value) * pxPerMm);
+                        parseFloat(qrSizeInput.value) * pxPerMm, 
+                        parseFloat(qrSizeInput.value) * pxPerMm);
                     
                     // Добавляем изображение и QR-код в SVG
                     addResultImageToSVG(svg, x, y, imgWidthPx, imgHeightPx, qrDataUrl);
@@ -850,14 +844,13 @@
             // Calculate QR code position relative to the image
             const qrX = x + (width * qrCodePosition.x);
             const qrY = y + (height * qrCodePosition.y);
-            const qrWidth = parseFloat(qrWidthInput.value) * 3.78;
-            const qrHeight = parseFloat(qrHeightInput.value) * 3.78;
+            const qrSize = parseFloat(qrSizeInput.value) * 3.78;
             
             // Add the QR code SVG to the main SVG
             qrSvg.setAttribute("x", qrX);
             qrSvg.setAttribute("y", qrY);
-            qrSvg.setAttribute("width", qrWidth);
-            qrSvg.setAttribute("height", qrHeight);
+            qrSvg.setAttribute("width", qrSize);
+            qrSvg.setAttribute("height", qrSize);
             // Ensure QR code is in the topmost layer by appending it last
             svg.appendChild(qrSvg);
         }
@@ -899,8 +892,7 @@
             
             // Рисуем QR-код в рассчитанной позиции
             if (qrDataUrl && qrCodePosition) {
-                const qrWidth = parseFloat(qrWidthInput.value) * 3.78;
-                const qrHeight = parseFloat(qrHeightInput.value) * 3.78;
+                const qrSize = parseFloat(qrSizeInput.value) * 3.78;
                 
                 const qrX = x + (width * qrCodePosition.x);
                 const qrY = y + (height * qrCodePosition.y);
@@ -908,7 +900,7 @@
                 // Создаем изображение QR-кода
                 const qrImg = new Image();
                 qrImg.onload = function() {
-                    ctx.drawImage(qrImg, qrX, qrY, qrWidth, qrHeight);
+                    ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize);
                 };
                 qrImg.src = qrDataUrl;
             }
