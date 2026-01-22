@@ -114,6 +114,8 @@
             border: 2px dashed red;
             cursor: move;
             display: none;
+            z-index: 1000; /* Ensure it stays on top */
+            pointer-events: auto; /* Make sure it receives mouse events */
         }
         
         #serialRangeInput {
@@ -164,9 +166,6 @@
             <div class="form-group">
                 <label for="qrHeight">Высота QR-кода (мм):</label>
                 <input type="number" id="qrHeight" min="1" value="10">
-            </div>
-            <div class="form-group">
-                <button id="positionQRBtn" class="secondary">Определить место для QR-кода</button>
             </div>
         </div>
         
@@ -225,6 +224,9 @@
         <!-- Section 7: Результаты -->
         <div class="section">
             <div class="section-title">7. Результаты обработки</div>
+            <div class="form-group">
+                <button id="positionQRBtn" class="secondary">Определить место для QR-кода</button>
+            </div>
             <div class="image-container">
                 <div class="image-box">
                     <h3>Исходное изображение</h3>
@@ -290,6 +292,11 @@
         qrCanvas.addEventListener('mousedown', startQRDrag);
         document.addEventListener('mousemove', dragQR);
         document.addEventListener('mouseup', stopQRDrag);
+        
+        // Prevent the QR canvas from losing focus when clicked
+        qrCanvas.addEventListener('click', function(e) {
+            e.stopPropagation();
+        });
         
         // Инициализация
         initializeApp();
@@ -474,12 +481,19 @@
             
             // Позиционируем QR-код в центр масштабированного изображения
             const rect = scaledCanvas.getBoundingClientRect();
+            
+            // Position relative to the scaled canvas container
             const containerRect = scaledCanvas.parentElement.getBoundingClientRect();
             
-            qrCanvas.style.left = (rect.left + window.scrollX + (rect.width - qrWidth) / 2) + 'px';
-            qrCanvas.style.top = (rect.top + window.scrollY + (rect.height - qrHeight) / 2) + 'px';
+            // Calculate position relative to the parent container
+            qrCanvas.style.position = 'absolute';
+            qrCanvas.style.left = (rect.left - containerRect.left + window.scrollX + (rect.width - qrWidth) / 2) + 'px';
+            qrCanvas.style.top = (rect.top - containerRect.top + window.scrollY + (rect.height - qrHeight) / 2) + 'px';
             
-            console.log("Режим позиционирования QR-кода активирован. Кликните на область для размещения QR-кода.");
+            // Make sure the canvas is positioned relative to the parent container
+            scaledCanvas.parentElement.style.position = 'relative';
+            
+            console.log("Режим позиционирования QR-кода активирован. Перетащите QR-код в нужное место.");
         }
         
         function startQRDrag(e) {
@@ -496,18 +510,23 @@
         function dragQR(e) {
             if (!isDraggingQR || !qrCanvasVisible) return;
             
-            const containerRect = scaledCanvas.getBoundingClientRect();
+            const containerRect = scaledCanvas.parentElement.getBoundingClientRect();
             
             // Ограничиваем перемещение внутри холста масштабированного изображения
-            let newX = e.clientX - dragOffset.x - containerRect.left + window.scrollX;
-            let newY = e.clientY - dragOffset.y - containerRect.top + window.scrollY;
+            let newX = e.clientX - dragOffset.x - containerRect.left;
+            let newY = e.clientY - dragOffset.y - containerRect.top;
             
-            // Ограничиваем координаты
-            newX = Math.max(0, Math.min(newX, containerRect.width - qrCanvas.width));
-            newY = Math.max(0, Math.min(newY, containerRect.height - qrCanvas.height));
+            // Get the scaled canvas dimensions to restrict movement within it
+            const scaledRect = scaledCanvas.getBoundingClientRect();
+            const relativeLeft = scaledRect.left - containerRect.left;
+            const relativeTop = scaledRect.top - containerRect.top;
             
-            qrCanvas.style.left = (containerRect.left + newX - window.scrollX) + 'px';
-            qrCanvas.style.top = (containerRect.top + newY - window.scrollY) + 'px';
+            // Ограничиваем координаты в пределах масштабированного изображения
+            newX = Math.max(relativeLeft, Math.min(newX, relativeLeft + scaledRect.width - qrCanvas.width));
+            newY = Math.max(relativeTop, Math.min(newY, relativeTop + scaledRect.height - qrCanvas.height));
+            
+            qrCanvas.style.left = newX + 'px';
+            qrCanvas.style.top = newY + 'px';
         }
         
         function stopQRDrag(e) {
@@ -516,11 +535,24 @@
             isDraggingQR = false;
             
             // Сохраняем позицию QR-кода относительно масштабированного изображения
-            const containerRect = scaledCanvas.getBoundingClientRect();
-            const qrRect = qrCanvas.getBoundingClientRect();
+            const containerRect = scaledCanvas.parentElement.getBoundingClientRect();
+            const scaledRect = scaledCanvas.getBoundingClientRect();
             
-            qrCodePosition.x = (qrRect.left - containerRect.left) / containerRect.width;
-            qrCodePosition.y = (qrRect.top - containerRect.top) / containerRect.height;
+            // Calculate position relative to the scaled canvas
+            const relativeLeft = parseFloat(qrCanvas.style.left) || 0;
+            const relativeTop = parseFloat(qrCanvas.style.top) || 0;
+            
+            // Calculate the offset of scaled canvas within its parent
+            const scaledOffsetX = scaledRect.left - containerRect.left;
+            const scaledOffsetY = scaledRect.top - containerRect.top;
+            
+            // Calculate position relative to the scaled canvas itself
+            const qrRelativeX = relativeLeft - scaledOffsetX;
+            const qrRelativeY = relativeTop - scaledOffsetY;
+            
+            // Normalize to percentage of scaled canvas size
+            qrCodePosition.x = qrRelativeX / scaledRect.width;
+            qrCodePosition.y = qrRelativeY / scaledRect.height;
             
             console.log(`Позиция QR-кода сохранена: x=${qrCodePosition.x}, y=${qrCodePosition.y}`);
         }
@@ -826,6 +858,7 @@
             qrSvg.setAttribute("y", qrY);
             qrSvg.setAttribute("width", qrWidth);
             qrSvg.setAttribute("height", qrHeight);
+            // Ensure QR code is in the topmost layer by appending it last
             svg.appendChild(qrSvg);
         }
         
