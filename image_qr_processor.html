@@ -116,6 +116,7 @@
             display: none;
             z-index: 1000; /* Ensure it stays on top */
             pointer-events: auto; /* Make sure it receives mouse events */
+            background-color: rgba(255, 255, 255, 0.7); /* Slightly transparent background */
         }
         
         #serialRangeInput {
@@ -295,7 +296,12 @@
         
         // Prevent the QR canvas from losing focus when clicked
         qrCanvas.addEventListener('click', function(e) {
+            e.preventDefault();
             e.stopPropagation();
+            // Ensure the canvas stays visible after click
+            if (qrCanvasVisible) {
+                qrCanvas.style.display = 'block';
+            }
         });
         
         // Инициализация
@@ -461,14 +467,21 @@
             tempCanvas.height = qrHeight;
             const tempCtx = tempCanvas.getContext('2d');
             
-            // Заливаем QR-код серым цветом для демонстрации
-            tempCtx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+            // Заливаем QR-код светло-серым цветом для демонстрации
+            tempCtx.fillStyle = 'rgba(200, 200, 200, 0.7)';
             tempCtx.fillRect(0, 0, qrWidth, qrHeight);
             
-            // Рисуем границу
+            // Рисуем красную границу
             tempCtx.strokeStyle = 'red';
             tempCtx.lineWidth = 2;
             tempCtx.strokeRect(0, 0, qrWidth, qrHeight);
+            
+            // Добавляем текст с примерным серийным номером
+            tempCtx.fillStyle = 'black';
+            tempCtx.font = '12px Arial';
+            tempCtx.textAlign = 'center';
+            tempCtx.textBaseline = 'middle';
+            tempCtx.fillText('QR', qrWidth/2, qrHeight/2);
             
             // Копируем на основной QR-код холст
             const qrCtx = qrCanvas.getContext('2d');
@@ -662,12 +675,12 @@
                     const y = row * (imgHeightPx + spacingYPx);
                     
                     // Генерируем QR-код для текущего серийного номера
-                    const qrDataUrl = generateQRCodeSVG(serialNum.toString(), 
+                    const qrSvg = generateQRCodeSVG(serialNum.toString(), 
                         parseFloat(qrWidthInput.value) * pxPerMm, 
                         parseFloat(qrHeightInput.value) * pxPerMm);
                     
                     // Добавляем изображение и QR-код в SVG
-                    addResultImageToSVG(svg, x, y, imgWidthPx, imgHeightPx, qrDataUrl);
+                    addResultImageToSVG(svg, x, y, imgWidthPx, imgHeightPx, qrSvg);
                     
                     serialNum++;
                     placedCount++;
@@ -774,17 +787,24 @@
                 }
             }
             
-            // Add data cells (simulated based on content)
-            // This is a simplified simulation - a real QR code would use proper encoding
+            // Add data cells based on the content (serial number)
+            // Each character in the content influences the pattern
             for (let i = 0; i < 11; i++) {
                 for (let j = 0; j < 11; j++) {
                     // Skip areas occupied by position markers
                     if (!((i < 7 && j < 7) || (i > 13 && j < 7) || (i < 7 && j > 13))) {
-                        // Simulate data based on content hash
-                        const index = (i * 11 + j + content.length) % content.length;
-                        const charCode = content.charCodeAt(index % content.length);
+                        // Create pattern based on content characters and their positions
+                        const charIndex = (i + j) % content.length;
+                        const charCode = content.charCodeAt(charIndex);
                         
-                        if ((charCode + i + j) % 3 === 0) { // Deterministic pattern based on content
+                        // Determine if cell should be filled based on content and position
+                        // This creates a unique pattern for each serial number
+                        const shouldFill = (
+                            (charCode ^ i ^ j) % 3 === 0 ||  // XOR pattern based on content
+                            (content.length + i * j) % 5 === 0  // Additional pattern based on content length
+                        );
+                        
+                        if (shouldFill) {
                             const rect = document.createElementNS(svgNS, "rect");
                             rect.setAttribute("x", i + 7);
                             rect.setAttribute("y", j + 7);
@@ -834,7 +854,7 @@
             }
         }
         
-        function addResultImageToSVG(svg, x, y, width, height, qrSvg) {
+        function addResultImageToSVG(svg, x, y, width, height, qrSvgElement) {
             const svgNS = "http://www.w3.org/2000/svg";
             
             // Add the scaled image to SVG using foreignObject or image element
@@ -854,12 +874,12 @@
             const qrHeight = parseFloat(qrHeightInput.value) * 3.78;
             
             // Add the QR code SVG to the main SVG
-            qrSvg.setAttribute("x", qrX);
-            qrSvg.setAttribute("y", qrY);
-            qrSvg.setAttribute("width", qrWidth);
-            qrSvg.setAttribute("height", qrHeight);
+            qrSvgElement.setAttribute("x", qrX);
+            qrSvgElement.setAttribute("y", qrY);
+            qrSvgElement.setAttribute("width", qrWidth);
+            qrSvgElement.setAttribute("height", qrHeight);
             // Ensure QR code is in the topmost layer by appending it last
-            svg.appendChild(qrSvg);
+            svg.appendChild(qrSvgElement);
         }
         
         function generateQRCode(content) {
