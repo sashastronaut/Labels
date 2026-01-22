@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Обработка изображений с QR-кодами</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        
+        .section {
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        
+        .section-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #555;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: inline-block;
+            width: 250px;
+            margin-right: 10px;
+        }
+        
+        input[type="text"], input[type="number"], select {
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            width: 100px;
+        }
+        
+        input[type="file"] {
+            padding: 5px;
+        }
+        
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        
+        button:hover {
+            background-color: #45a049;
+        }
+        
+        button.secondary {
+            background-color: #2196F3;
+        }
+        
+        button.secondary:hover {
+            background-color: #1976D2;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        .image-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .image-box {
+            text-align: center;
+            border: 1px solid #ddd;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        
+        .image-box img {
+            max-width: 100%;
+            max-height: 300px;
+        }
+        
+        canvas {
+            border: 1px solid #ccc;
+            max-width: 100%;
+        }
+        
+        #qrCanvas {
+            position: absolute;
+            border: 2px dashed red;
+            cursor: move;
+            display: none;
+        }
+        
+        #serialRangeInput {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        #customSizeFields {
+            margin-left: 20px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Обработка изображений с QR-кодами</h1>
+        
+        <!-- Section 1: Загрузка изображения -->
+        <div class="section">
+            <div class="section-title">1. Загрузка исходного изображения</div>
+            <div class="form-group">
+                <label for="imageUpload">Загрузить изображение:</label>
+                <input type="file" id="imageUpload" accept=".jpg,.jpeg,.png,.svg">
+            </div>
+        </div>
+        
+        <!-- Section 2: Размеры изображения -->
+        <div class="section">
+            <div class="section-title">2. Размеры итогового изображения</div>
+            <div class="form-group">
+                <label for="imgWidth">Ширина изображения (мм):</label>
+                <input type="number" id="imgWidth" min="1" value="50">
+            </div>
+            <div class="form-group">
+                <label for="imgHeight">Высота изображения (мм):</label>
+                <input type="number" id="imgHeight" min="1" value="50">
+            </div>
+        </div>
+        
+        <!-- Section 3: QR-код -->
+        <div class="section">
+            <div class="section-title">3. QR-код</div>
+            <div class="form-group">
+                <label for="qrWidth">Ширина QR-кода (мм):</label>
+                <input type="number" id="qrWidth" min="1" value="10">
+            </div>
+            <div class="form-group">
+                <label for="qrHeight">Высота QR-кода (мм):</label>
+                <input type="number" id="qrHeight" min="1" value="10">
+            </div>
+            <div class="form-group">
+                <button id="positionQRBtn" class="secondary">Определить место для QR-кода</button>
+            </div>
+        </div>
+        
+        <!-- Section 4: Размеры листа -->
+        <div class="section">
+            <div class="section-title">4. Размеры итогового листа</div>
+            <div class="form-group">
+                <label for="sheetSizeSelect">Выберите размер листа:</label>
+                <select id="sheetSizeSelect">
+                    <option value="A4">A4 (210x297 мм)</option>
+                    <option value="A3">A3 (297x420 мм)</option>
+                    <option value="A2">A2 (420x594 мм)</option>
+                    <option value="custom">Нестандартный размер листа</option>
+                </select>
+                
+                <div id="customSizeFields">
+                    <div style="margin-top: 10px;">
+                        <label for="customWidth">Ширина листа (мм):</label>
+                        <input type="number" id="customWidth" min="1" value="210">
+                    </div>
+                    <div>
+                        <label for="customHeight">Высота листа (мм):</label>
+                        <input type="number" id="customHeight" min="1" value="297">
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Section 5: Отступы -->
+        <div class="section">
+            <div class="section-title">5. Отступы между изображениями</div>
+            <div class="form-group">
+                <label for="spacingX">Отступ по X (мм):</label>
+                <input type="number" id="spacingX" min="0" value="5">
+            </div>
+            <div class="form-group">
+                <label for="spacingY">Отступ по Y (мм):</label>
+                <input type="number" id="spacingY" min="0" value="5">
+            </div>
+        </div>
+        
+        <!-- Section 6: Серийные номера -->
+        <div class="section">
+            <div class="section-title">6. Серийные номера</div>
+            <div class="form-group">
+                <div id="serialRangeInput">
+                    <label>Диапазон серийных номеров:</label>
+                    <span>С</span>
+                    <input type="number" id="startSerial" min="1" value="1">
+                    <span>По</span>
+                    <input type="number" id="endSerial" min="1" value="10">
+                </div>
+            </div>
+        </div>
+        
+        <!-- Section 7: Результаты -->
+        <div class="section">
+            <div class="section-title">7. Результаты обработки</div>
+            <div class="image-container">
+                <div class="image-box">
+                    <h3>Исходное изображение</h3>
+                    <canvas id="originalCanvas"></canvas>
+                </div>
+                <div class="image-box">
+                    <h3>Масштабированное изображение</h3>
+                    <canvas id="scaledCanvas"></canvas>
+                </div>
+                <div class="image-box">
+                    <h3>Итоговое изображение</h3>
+                    <canvas id="resultCanvas"></canvas>
+                </div>
+            </div>
+            
+            <div style="text-align: center; margin-top: 20px;">
+                <button id="downloadSheetBtn">Скачать итоговый лист</button>
+            </div>
+        </div>
+        
+        <!-- Canvas для позиционирования QR-кода -->
+        <canvas id="qrCanvas" width="100" height="100"></canvas>
+    </div>
+
+    <script src="https://cdn.rawgit.com/davidshimjs/qrcodejs/master/qrcode.min.js"></script>
+    <script>
+        // Основные переменные
+        let originalImage = null;
+        let scaledImage = null;
+        let qrCodePosition = { x: 0, y: 0 };
+        let isDraggingQR = false;
+        let dragOffset = { x: 0, y: 0 };
+        let qrCanvasVisible = false;
+        
+        // DOM элементы
+        const imageUpload = document.getElementById('imageUpload');
+        const imgWidthInput = document.getElementById('imgWidth');
+        const imgHeightInput = document.getElementById('imgHeight');
+        const qrWidthInput = document.getElementById('qrWidth');
+        const qrHeightInput = document.getElementById('qrHeight');
+        const positionQRBtn = document.getElementById('positionQRBtn');
+        const sheetSizeSelect = document.getElementById('sheetSizeSelect');
+        const customSizeFields = document.getElementById('customSizeFields');
+        const customWidthInput = document.getElementById('customWidth');
+        const customHeightInput = document.getElementById('customHeight');
+        const spacingXInput = document.getElementById('spacingX');
+        const spacingYInput = document.getElementById('spacingY');
+        const startSerialInput = document.getElementById('startSerial');
+        const endSerialInput = document.getElementById('endSerial');
+        const downloadSheetBtn = document.getElementById('downloadSheetBtn');
+        const originalCanvas = document.getElementById('originalCanvas');
+        const scaledCanvas = document.getElementById('scaledCanvas');
+        const resultCanvas = document.getElementById('resultCanvas');
+        const qrCanvas = document.getElementById('qrCanvas');
+        
+        // Обработчики событий
+        imageUpload.addEventListener('change', handleImageUpload);
+        positionQRBtn.addEventListener('click', enableQRPositioning);
+        sheetSizeSelect.addEventListener('change', toggleCustomSizeFields);
+        downloadSheetBtn.addEventListener('click', downloadFinalSheet);
+        
+        // Обработчики для перемещения QR-кода
+        qrCanvas.addEventListener('mousedown', startQRDrag);
+        document.addEventListener('mousemove', dragQR);
+        document.addEventListener('mouseup', stopQRDrag);
+        
+        // Инициализация
+        initializeApp();
+        
+        function initializeApp() {
+            // Устанавливаем начальные размеры холстов
+            originalCanvas.width = 300;
+            originalCanvas.height = 300;
+            scaledCanvas.width = 300;
+            scaledCanvas.height = 300;
+            resultCanvas.width = 300;
+            resultCanvas.height = 300;
+            
+            // Рисуем пример на холстах
+            drawPlaceholder(originalCanvas, "Исходное изображение");
+            drawPlaceholder(scaledCanvas, "Масштабированное изображение");
+            drawPlaceholder(resultCanvas, "Итоговое изображение");
+        }
+        
+        function drawPlaceholder(canvas, text) {
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#f0f0f0';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.strokeStyle = '#ccc';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.fillStyle = '#999';
+            ctx.font = '14px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(text, canvas.width/2, canvas.height/2);
+        }
+        
+        function handleImageUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    originalImage = img;
+                    
+                    // Рисуем исходное изображение
+                    drawImageOnCanvas(img, originalCanvas);
+                    
+                    // Масштабируем изображение
+                    scaleImage();
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+        
+        function drawImageOnCanvas(image, canvas) {
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Рассчитываем пропорции
+            const maxWidth = canvas.width - 20;
+            const maxHeight = canvas.height - 20;
+            const ratio = Math.min(maxWidth / image.width, maxHeight / image.height);
+            
+            const width = image.width * ratio;
+            const height = image.height * ratio;
+            
+            // Центрируем изображение
+            const x = (canvas.width - width) / 2;
+            const y = (canvas.height - height) / 2;
+            
+            ctx.drawImage(image, x, y, width, height);
+        }
+        
+        function scaleImage() {
+            if (!originalImage) return;
+            
+            const targetWidth = parseFloat(imgWidthInput.value);
+            const targetHeight = parseFloat(imgHeightInput.value);
+            
+            if (!targetWidth || !targetHeight) return;
+            
+            // Создаем временный canvas для масштабирования
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+            
+            // Рассчитываем размеры в пикселях (примерное преобразование мм в пиксели)
+            const pxPerMm = 3.78; // Примерно 96 DPI / 25.4 мм/дюйм
+            tempCanvas.width = targetWidth * pxPerMm;
+            tempCanvas.height = targetHeight * pxPerMm;
+            
+            tempCtx.drawImage(
+                originalImage, 
+                0, 0, originalImage.width, originalImage.height,
+                0, 0, tempCanvas.width, tempCanvas.height
+            );
+            
+            scaledImage = new Image();
+            scaledImage.src = tempCanvas.toDataURL();
+            scaledImage.onload = function() {
+                // Рисуем масштабированное изображение
+                const ctx = scaledCanvas.getContext('2d');
+                ctx.clearRect(0, 0, scaledCanvas.width, scaledCanvas.height);
+                
+                // Пропорционально растягиваем на весь холст
+                ctx.drawImage(scaledImage, 0, 0, scaledCanvas.width, scaledCanvas.height);
+            };
+        }
+        
+        function enableQRPositioning() {
+            if (!scaledImage) {
+                alert("Сначала загрузите и масштабируйте изображение!");
+                return;
+            }
+            
+            // Показываем QR-код на холсте
+            const qrWidth = parseFloat(qrWidthInput.value) * 3.78; // мм в пиксели
+            const qrHeight = parseFloat(qrHeightInput.value) * 3.78;
+            
+            qrCanvas.width = qrWidth;
+            qrCanvas.height = qrHeight;
+            
+            // Рисуем QR-код на временном холсте
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = qrWidth;
+            tempCanvas.height = qrHeight;
+            const tempCtx = tempCanvas.getContext('2d');
+            
+            // Заливаем QR-код серым цветом для демонстрации
+            tempCtx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+            tempCtx.fillRect(0, 0, qrWidth, qrHeight);
+            
+            // Рисуем границу
+            tempCtx.strokeStyle = 'red';
+            tempCtx.lineWidth = 2;
+            tempCtx.strokeRect(0, 0, qrWidth, qrHeight);
+            
+            // Копируем на основной QR-код холст
+            const qrCtx = qrCanvas.getContext('2d');
+            qrCtx.clearRect(0, 0, qrCanvas.width, qrCanvas.height);
+            qrCtx.drawImage(tempCanvas, 0, 0);
+            
+            // Показываем QR-код
+            qrCanvas.style.display = 'block';
+            qrCanvasVisible = true;
+            
+            // Позиционируем QR-код в центр масштабированного изображения
+            const rect = scaledCanvas.getBoundingClientRect();
+            const containerRect = scaledCanvas.parentElement.getBoundingClientRect();
+            
+            qrCanvas.style.left = (rect.left + window.scrollX + (rect.width - qrWidth) / 2) + 'px';
+            qrCanvas.style.top = (rect.top + window.scrollY + (rect.height - qrHeight) / 2) + 'px';
+            
+            console.log("Режим позиционирования QR-кода активирован. Кликните на область для размещения QR-кода.");
+        }
+        
+        function startQRDrag(e) {
+            if (!qrCanvasVisible) return;
+            
+            isDraggingQR = true;
+            const rect = qrCanvas.getBoundingClientRect();
+            dragOffset.x = e.clientX - rect.left;
+            dragOffset.y = e.clientY - rect.top;
+            
+            e.preventDefault();
+        }
+        
+        function dragQR(e) {
+            if (!isDraggingQR || !qrCanvasVisible) return;
+            
+            const containerRect = scaledCanvas.getBoundingClientRect();
+            
+            // Ограничиваем перемещение внутри холста масштабированного изображения
+            let newX = e.clientX - dragOffset.x - containerRect.left + window.scrollX;
+            let newY = e.clientY - dragOffset.y - containerRect.top + window.scrollY;
+            
+            // Ограничиваем координаты
+            newX = Math.max(0, Math.min(newX, containerRect.width - qrCanvas.width));
+            newY = Math.max(0, Math.min(newY, containerRect.height - qrCanvas.height));
+            
+            qrCanvas.style.left = (containerRect.left + newX - window.scrollX) + 'px';
+            qrCanvas.style.top = (containerRect.top + newY - window.scrollY) + 'px';
+        }
+        
+        function stopQRDrag(e) {
+            if (!isDraggingQR) return;
+            
+            isDraggingQR = false;
+            
+            // Сохраняем позицию QR-кода относительно масштабированного изображения
+            const containerRect = scaledCanvas.getBoundingClientRect();
+            const qrRect = qrCanvas.getBoundingClientRect();
+            
+            qrCodePosition.x = (qrRect.left - containerRect.left) / containerRect.width;
+            qrCodePosition.y = (qrRect.top - containerRect.top) / containerRect.height;
+            
+            console.log(`Позиция QR-кода сохранена: x=${qrCodePosition.x}, y=${qrCodePosition.y}`);
+        }
+        
+        function toggleCustomSizeFields() {
+            if (sheetSizeSelect.value === 'custom') {
+                customSizeFields.classList.remove('hidden');
+            } else {
+                customSizeFields.classList.add('hidden');
+            }
+        }
+        
+        function downloadFinalSheet() {
+            if (!scaledImage) {
+                alert("Сначала загрузите и масштабируйте изображение!");
+                return;
+            }
+            
+            if (qrCodePosition.x === 0 && qrCodePosition.y === 0) {
+                alert("Укажите положение QR-кода!");
+                return;
+            }
+            
+            // Получаем размеры листа
+            let sheetWidth, sheetHeight;
+            if (sheetSizeSelect.value === 'custom') {
+                sheetWidth = parseFloat(customWidthInput.value);
+                sheetHeight = parseFloat(customHeightInput.value);
+            } else {
+                // Стандартные размеры в мм
+                switch(sheetSizeSelect.value) {
+                    case 'A4':
+                        sheetWidth = 210;
+                        sheetHeight = 297;
+                        break;
+                    case 'A3':
+                        sheetWidth = 297;
+                        sheetHeight = 420;
+                        break;
+                    case 'A2':
+                        sheetWidth = 420;
+                        sheetHeight = 594;
+                        break;
+                    default:
+                        sheetWidth = 210;
+                        sheetHeight = 297;
+                }
+            }
+            
+            const startSerial = parseInt(startSerialInput.value);
+            const endSerial = parseInt(endSerialInput.value);
+            const spacingX = parseFloat(spacingXInput.value);
+            const spacingY = parseFloat(spacingYInput.value);
+            
+            if (isNaN(startSerial) || isNaN(endSerial) || startSerial > endSerial) {
+                alert("Некорректный диапазон серийных номеров!");
+                return;
+            }
+            
+            // Создаем итоговый лист
+            generateFinalSheet(sheetWidth, sheetHeight, startSerial, endSerial, spacingX, spacingY);
+        }
+        
+        function generateFinalSheet(sheetWidth, sheetHeight, startSerial, endSerial, spacingX, spacingY) {
+            // Создаем временный холст для итогового листа
+            const pxPerMm = 3.78; // 96 DPI / 25.4 мм/дюйм
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = sheetWidth * pxPerMm;
+            tempCanvas.height = sheetHeight * pxPerMm;
+            
+            const ctx = tempCanvas.getContext('2d');
+            
+            // Заливаем фон белым цветом
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+            
+            // Рассчитываем количество изображений по осям
+            const imgWidth = parseFloat(imgWidthInput.value);
+            const imgHeight = parseFloat(imgHeightInput.value);
+            
+            // Преобразуем в пиксели
+            const imgWidthPx = imgWidth * pxPerMm;
+            const imgHeightPx = imgHeight * pxPerMm;
+            const spacingXPx = spacingX * pxPerMm;
+            const spacingYPx = spacingY * pxPerMm;
+            
+            // Расчет количества элементов в строке и столбце
+            const cols = Math.floor((sheetWidth * pxPerMm) / (imgWidthPx + spacingXPx));
+            const rows = Math.floor((sheetHeight * pxPerMm) / (imgHeightPx + spacingYPx));
+            
+            let serialNum = startSerial;
+            let placedCount = 0;
+            
+            // Размещаем изображения на листе
+            for (let row = 0; row < rows && serialNum <= endSerial; row++) {
+                for (let col = 0; col < cols && serialNum <= endSerial; col++) {
+                    const x = col * (imgWidthPx + spacingXPx);
+                    const y = row * (imgHeightPx + spacingYPx);
+                    
+                    // Генерируем QR-код для текущего серийного номера
+                    const qrDataUrl = generateQRCode(serialNum.toString());
+                    
+                    // Рисуем итоговое изображение (масштабированное + QR-код)
+                    drawResultImage(ctx, x, y, imgWidthPx, imgHeightPx, qrDataUrl);
+                    
+                    serialNum++;
+                    placedCount++;
+                }
+            }
+            
+            // Показываем итоговое изображение в результатах
+            resultCanvas.width = Math.min(600, tempCanvas.width);
+            resultCanvas.height = Math.min(400, tempCanvas.height);
+            const resultCtx = resultCanvas.getContext('2d');
+            resultCtx.drawImage(
+                tempCanvas, 
+                0, 0, tempCanvas.width, tempCanvas.height,
+                0, 0, resultCanvas.width, resultCanvas.height
+            );
+            
+            // Скачиваем изображение
+            const link = document.createElement('a');
+            link.download = 'final_sheet.png';
+            link.href = tempCanvas.toDataURL('image/png');
+            link.click();
+            
+            console.log(`Сформирован лист с ${placedCount} изображениями`);
+        }
+        
+        function generateQRCode(content) {
+            // Создаем временный div для генерации QR-кода
+            const tempDiv = document.createElement('div');
+            tempDiv.style.position = 'absolute';
+            tempDiv.style.visibility = 'hidden';
+            tempDiv.style.left = '-999px';
+            tempDiv.style.top = '-999px';
+            document.body.appendChild(tempDiv);
+            
+            // Генерируем QR-код
+            new QRCode(tempDiv, {
+                text: content,
+                width: 50,
+                height: 50,
+                colorDark: "#000000",
+                colorLight: "#ffffff",
+                correctLevel: QRCode.CorrectLevel.H
+            });
+            
+            // Ждем немного, чтобы QR-код был сгенерирован
+            setTimeout(() => {
+                // Получаем изображение QR-кода
+                const qrImg = tempDiv.querySelector('img');
+                if (qrImg) {
+                    // Удаляем временный элемент
+                    document.body.removeChild(tempDiv);
+                    return qrImg.src;
+                }
+            }, 100);
+            
+            // Возвращаем placeholder, так как генерация асинхронная
+            return null;
+        }
+        
+        function drawResultImage(ctx, x, y, width, height, qrDataUrl) {
+            // Рисуем масштабированное изображение
+            ctx.drawImage(scaledImage, x, y, width, height);
+            
+            // Рисуем QR-код в рассчитанной позиции
+            if (qrDataUrl && qrCodePosition) {
+                const qrWidth = parseFloat(qrWidthInput.value) * 3.78;
+                const qrHeight = parseFloat(qrHeightInput.value) * 3.78;
+                
+                const qrX = x + (width * qrCodePosition.x);
+                const qrY = y + (height * qrCodePosition.y);
+                
+                // Создаем изображение QR-кода
+                const qrImg = new Image();
+                qrImg.onload = function() {
+                    ctx.drawImage(qrImg, qrX, qrY, qrWidth, qrHeight);
+                };
+                qrImg.src = qrDataUrl;
+            }
+        }
+        
+        // Обновление масштабированного изображения при изменении размеров
+        imgWidthInput.addEventListener('change', scaleImage);
+        imgHeightInput.addEventListener('change', scaleImage);
+    </script>
+</body>
+</html>
